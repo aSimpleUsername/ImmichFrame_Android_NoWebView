@@ -102,6 +102,12 @@ class MainActivity : AppCompatActivity() {
             when (intent?.action) {
                 Intent.ACTION_SCREEN_ON -> onScreenTurnedOn()
                 Intent.ACTION_SCREEN_OFF -> onScreenTurnedOff()
+                // ACTION_TIME_TICK fires every minute on the minute (system only delivers it
+                // to a registered receiver, and not while the screen is off). TIME/TIMEZONE
+                // _CHANGED let the clock jump the moment NTP corrects the frame's boot clock.
+                Intent.ACTION_TIME_TICK,
+                Intent.ACTION_TIME_CHANGED,
+                Intent.ACTION_TIMEZONE_CHANGED -> updateDateTimeWeather()
             }
         }
     }
@@ -186,6 +192,9 @@ class MainActivity : AppCompatActivity() {
             IntentFilter().apply {
                 addAction(Intent.ACTION_SCREEN_ON)
                 addAction(Intent.ACTION_SCREEN_OFF)
+                addAction(Intent.ACTION_TIME_TICK)
+                addAction(Intent.ACTION_TIME_CHANGED)
+                addAction(Intent.ACTION_TIMEZONE_CHANGED)
             },
         )
 
@@ -328,11 +337,18 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateDateTimeWeather() {
+        // A time tick can arrive before server settings have loaded; serverSettings is a
+        // lateinit, so bail out rather than crash on a wall-mounted frame.
+        if (!this::serverSettings.isInitialized) return
         if (serverSettings.showClock) {
             val currentDateTime = Calendar.getInstance().time
 
+            // Use the server's dedicated clock-date format; fall back to the photo-date
+            // format for older servers that don't send clockDateFormat.
+            val dateFormat = serverSettings.clockDateFormat?.takeIf { it.isNotBlank() }
+                ?: serverSettings.photoDateFormat
             val formattedDate = try {
-                SimpleDateFormat(serverSettings.photoDateFormat, Locale.getDefault()).format(
+                SimpleDateFormat(dateFormat, Locale.getDefault()).format(
                     currentDateTime
                 )
             } catch (_: Exception) {

@@ -3,6 +3,10 @@ package com.immichframe.immichframe
 import android.animation.ObjectAnimator
 import android.animation.PropertyValuesHolder
 import android.annotation.SuppressLint
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.os.Handler
@@ -36,6 +40,13 @@ import androidx.core.net.toUri
 
 class ScreenSaverService : DreamService() {
     private var wakeLock: PowerManager.WakeLock? = null
+    // Redraw the clock every minute (ACTION_TIME_TICK) and whenever the clock/timezone is
+    // corrected (e.g. by NTP). Registered only while dreaming.
+    private val timeTickReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            updateDateTimeWeather()
+        }
+    }
     private lateinit var imageView1: ImageView
     private lateinit var imageView2: ImageView
     private lateinit var txtPhotoInfo: TextView
@@ -88,12 +99,19 @@ class ScreenSaverService : DreamService() {
             true
         }
 
+        registerReceiver(timeTickReceiver, IntentFilter().apply {
+            addAction(Intent.ACTION_TIME_TICK)
+            addAction(Intent.ACTION_TIME_CHANGED)
+            addAction(Intent.ACTION_TIMEZONE_CHANGED)
+        })
+
         acquireWakeLock()
         loadSettings()
     }
 
     override fun onDreamingStopped() {
         super.onDreamingStopped()
+        unregisterReceiver(timeTickReceiver)
         stopImageTimer()
         releaseWakeLock()
         handler.removeCallbacksAndMessages(null)
@@ -262,11 +280,18 @@ class ScreenSaverService : DreamService() {
     }
 
     private fun updateDateTimeWeather() {
+        // A time tick can arrive before server settings have loaded; serverSettings is a
+        // lateinit, so bail out rather than crash.
+        if (!this::serverSettings.isInitialized) return
         if (serverSettings.showClock) {
             val currentDateTime = Calendar.getInstance().time
 
+            // Use the server's dedicated clock-date format; fall back to the photo-date
+            // format for older servers that don't send clockDateFormat.
+            val dateFormat = serverSettings.clockDateFormat?.takeIf { it.isNotBlank() }
+                ?: serverSettings.photoDateFormat
             val formattedDate = try {
-                SimpleDateFormat(serverSettings.photoDateFormat, Locale.getDefault()).format(
+                SimpleDateFormat(dateFormat, Locale.getDefault()).format(
                     currentDateTime
                 )
             } catch (_: Exception) {

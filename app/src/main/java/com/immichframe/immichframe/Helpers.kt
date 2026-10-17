@@ -121,6 +121,7 @@ object Helpers {
         val renewImagesDuration: Int,
         val showClock: Boolean,
         val clockFormat: String,
+        val clockDateFormat: String?,
         val showPhotoDate: Boolean,
         val photoDateFormat: String,
         val showImageDesc: Boolean,
