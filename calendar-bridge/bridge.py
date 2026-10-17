@@ -11,6 +11,8 @@ import json
 import os
 import threading
 import time
+import urllib.error
+import urllib.parse
 import urllib.request
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from zoneinfo import ZoneInfo
@@ -83,11 +85,14 @@ def format_when(start, now, all_day):
 
 def fetch_events():
     token = get_token()
-    now = datetime.datetime.now(TZ)
+    now = datetime.datetime.now(TZ).replace(microsecond=0)
     end = now + datetime.timedelta(days=LOOKAHEAD_DAYS)
+    # URL-encode the timestamps: isoformat() emits an offset like "+08:00", and a bare
+    # "+" in a query string means a space, which Graph rejects with HTTP 400.
     url = (
         "https://graph.microsoft.com/v1.0/me/calendarView"
-        f"?startDateTime={now.isoformat()}&endDateTime={end.isoformat()}"
+        f"?startDateTime={urllib.parse.quote(now.isoformat())}"
+        f"&endDateTime={urllib.parse.quote(end.isoformat())}"
         "&$orderby=start/dateTime&$top=25&$select=subject,start,isAllDay"
     )
     req = urllib.request.Request(
@@ -97,8 +102,12 @@ def fetch_events():
             "Prefer": f'outlook.timezone="{TZ.key}"',
         },
     )
-    with urllib.request.urlopen(req, timeout=20) as r:
-        items = json.load(r).get("value", [])
+    try:
+        with urllib.request.urlopen(req, timeout=20) as r:
+            items = json.load(r).get("value", [])
+    except urllib.error.HTTPError as e:
+        body = e.read().decode(errors="replace")[:500]
+        raise RuntimeError(f"Graph {e.code}: {body}") from None
     out = []
     for it in items[:COUNT]:
         s = it["start"]["dateTime"]  # local to TZ via Prefer header
