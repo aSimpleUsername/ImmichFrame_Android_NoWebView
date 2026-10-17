@@ -1,0 +1,24 @@
+# Paste this service into your existing docker-compose.yml (same file as Immich /
+# ImmichFrame), then `docker compose up -d --build immichframe-calendar`.
+# Replace <your-app-client-id> with the Application (client) ID from the Azure
+# app registration. No client secret is used (device-code flow).
+
+  immichframe-calendar:
+    build: ./calendar-bridge
+    container_name: immichframe-calendar
+    restart: unless-stopped
+    environment:
+      CLIENT_ID: "<your-app-client-id>"
+      TZ: "Australia/Perth"
+      # Optional overrides:
+      # LOOKAHEAD_DAYS: "90"
+      # COUNT: "3"
+      # REFRESH_MINUTES: "15"
+      # PORT: "8099"
+    volumes:
+      - immichframe-cal-data:/data
+    ports:
+      - "8099:8099"
+
+# And add this under the top-level `volumes:` key of the compose file:
+#   immichframe-cal-data:
