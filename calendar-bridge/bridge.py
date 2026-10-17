@@ -29,50 +29,53 @@ PORT = int(os.environ.get("PORT", "8099"))
 REFRESH_MINUTES = int(os.environ.get("REFRESH_MINUTES", "15"))
 
 
-def _cache():
-    c = msal.SerializableTokenCache()
-    if os.path.exists(CACHE_PATH):
-        c.deserialize(open(CACHE_PATH).read())
-    atexit.register(
-        lambda: open(CACHE_PATH, "w").write(c.serialize()) if c.has_state_changed else None
-    )
-    return c
+_token_cache = msal.SerializableTokenCache()
+if os.path.exists(CACHE_PATH):
+    _token_cache.deserialize(open(CACHE_PATH).read())
+atexit.register(
+    lambda: open(CACHE_PATH, "w").write(_token_cache.serialize())
+    if _token_cache.has_state_changed else None
+)
+
+_app = msal.PublicClientApplication(CLIENT_ID, authority=AUTHORITY, token_cache=_token_cache)
 
 
-_app = msal.PublicClientApplication(CLIENT_ID, authority=AUTHORITY, token_cache=_cache())
-
-
-def get_token() -> str:
+def get_token(interactive: bool = False) -> str:
     accts = _app.get_accounts()
     res = _app.acquire_token_silent(SCOPES, account=accts[0]) if accts else None
     if not res:
+        if not interactive:
+            # Called from the refresh loop with no usable cached token. Fail cleanly so the
+            # loop keeps serving the last good state, instead of blocking on (and spamming)
+            # an interactive device-code login every cycle.
+            raise RuntimeError("no cached credentials; restart the container to log in")
         flow = _app.initiate_device_flow(scopes=SCOPES)
         print(flow["message"], flush=True)  # "go to microsoft.com/devicelogin and enter CODE"
         res = _app.acquire_token_by_device_flow(flow)
     if "access_token" not in res:
         raise RuntimeError(res.get("error_description", "auth failed"))
-    open(CACHE_PATH, "w").write(_app.token_cache.serialize())
+    if _token_cache.has_state_changed:  # persist a new or silently-refreshed token
+        open(CACHE_PATH, "w").write(_token_cache.serialize())
     return res["access_token"]
 
 
 def format_when(start, now, all_day):
     delta = (start.date() - now.date()).days
+    day = f"{start.day} {start.strftime('%b')}"  # e.g. "5 Oct" (no zero-pad)
     if all_day:
         if delta == 0:
             return "Today"
         if delta == 1:
             return "Tomorrow"
-        if 2 <= delta < 7:
-            return start.strftime("%a")
-        return start.strftime("%a %d %b").lstrip("0")
+        return f"{start.strftime('%a')} {day}"   # "Mon 20 Oct"
     tod = start.strftime("%H:%M")
     if delta == 0:
         return f"Today {tod}"
     if delta == 1:
         return f"Tomorrow {tod}"
     if 2 <= delta < 7:
-        return f"{start.strftime('%a')} {tod}"
-    return f"{start.strftime('%d %b').lstrip('0')} {tod}"
+        return f"{start.strftime('%a')} {tod}"   # "Sun 09:00"
+    return f"{day} {tod}"                          # "30 Oct 09:00"
 
 
 def fetch_events():
@@ -139,7 +142,7 @@ class H(BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
-    get_token()  # trigger device-code login on first run
+    get_token(interactive=True)  # trigger device-code login on first run
     threading.Thread(target=_refresh_loop, daemon=True).start()
     print(f"serving on :{PORT}/events", flush=True)
     HTTPServer(("0.0.0.0", PORT), H).serve_forever()

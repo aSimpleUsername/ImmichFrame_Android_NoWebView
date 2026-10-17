@@ -95,6 +95,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
     private var calendarUrl: String = ""
+    private var calendarApiService: Helpers.ApiService? = null
     private var isCalendarTimerRunning = false
     private val calendarRunnable = object : Runnable {
         override fun run() {
@@ -632,18 +633,25 @@ class MainActivity : AppCompatActivity() {
         }
 
         if (calendarUrl.isNotEmpty()) {
+            if (calendarApiService == null) {
+                calendarApiService =
+                    Helpers.createCalendarRetrofit().create(Helpers.ApiService::class.java)
+            }
             if (!isCalendarTimerRunning) {
                 isCalendarTimerRunning = true
                 handler.post(calendarRunnable)
             }
         } else {
+            isCalendarTimerRunning = false
+            handler.removeCallbacks(calendarRunnable)
             txtCalendar.visibility = View.GONE
         }
     }
 
     private fun getCalendar() {
+        val service = calendarApiService ?: return
         if (calendarUrl.isEmpty()) return
-        apiService.getCalendar(calendarUrl).enqueue(object : Callback<Helpers.CalendarResponse> {
+        service.getCalendar(calendarUrl).enqueue(object : Callback<Helpers.CalendarResponse> {
             override fun onResponse(
                 call: Call<Helpers.CalendarResponse>,
                 response: Response<Helpers.CalendarResponse>

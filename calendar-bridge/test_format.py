@@ -32,9 +32,15 @@ def test_timed_far():
     assert format_when(at(2026, 10, 30, 9, 0), NOW, False) == "30 Oct 09:00"
 
 
+def test_timed_far_single_digit_day():
+    # day number must not be zero-padded
+    assert format_when(at(2026, 11, 3, 9, 0), NOW, False) == "3 Nov 09:00"
+
+
 def test_allday_today():
     assert format_when(at(2026, 10, 17), NOW, True) == "Today"
 
 
 def test_allday_far():
+    # all-day events beyond tomorrow show weekday + unpadded date
     assert format_when(at(2026, 10, 20), NOW, True) == "Mon 20 Oct"

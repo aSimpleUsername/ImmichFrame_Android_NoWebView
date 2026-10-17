@@ -197,6 +197,18 @@ object Helpers {
             .addConverterFactory(GsonConverterFactory.create()).build()
     }
 
+    // Separate client for the calendar bridge: no auth interceptor, so the ImmichFrame
+    // bearer secret is never sent to the (different) bridge host. The actual URL is
+    // supplied per-call via @Url, so the base here is only a required placeholder.
+    fun createCalendarRetrofit(): Retrofit {
+        val client = OkHttpClient.Builder()
+            .connectTimeout(10, TimeUnit.SECONDS)
+            .readTimeout(10, TimeUnit.SECONDS)
+            .build()
+        return Retrofit.Builder().baseUrl("http://localhost/").client(client)
+            .addConverterFactory(GsonConverterFactory.create()).build()
+    }
+
     private val reachabilityClient = OkHttpClient.Builder()
         .connectTimeout(5, TimeUnit.SECONDS)
         .readTimeout(5, TimeUnit.SECONDS)
