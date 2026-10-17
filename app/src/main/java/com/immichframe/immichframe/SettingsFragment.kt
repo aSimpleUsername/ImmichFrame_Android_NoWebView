@@ -23,9 +23,6 @@ import java.util.Locale
 class SettingsFragment : PreferenceFragmentCompat() {
     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
         setPreferencesFromResource(R.xml.settings_view, rootKey)
-        val chkUseWebView = findPreference<SwitchPreferenceCompat>("useWebView")
-        val chkBlurredBackground = findPreference<SwitchPreferenceCompat>("blurredBackground")
-        val chkShowCurrentDate = findPreference<SwitchPreferenceCompat>("showCurrentDate")
         val chkActiveTimes = findPreference<SwitchPreferenceCompat>("activeTimes")
         val editActiveSchedule = findPreference<Preference>("active_schedule_edit")
         val adminActiveSchedule = findPreference<Preference>("active_schedule_admin")
@@ -38,9 +35,6 @@ class SettingsFragment : PreferenceFragmentCompat() {
         }
 
         // Update visibility based on switches
-        val useWebView = chkUseWebView?.isChecked ?: false
-        chkBlurredBackground?.isVisible = !useWebView
-        chkShowCurrentDate?.isVisible = !useWebView
         val activeTimes = chkActiveTimes?.isChecked ?: false
         editActiveSchedule?.isVisible = activeTimes
         adminActiveSchedule?.isVisible = activeTimes
@@ -48,13 +42,6 @@ class SettingsFragment : PreferenceFragmentCompat() {
         updateScheduleSummary(editActiveSchedule)
 
         // React to changes
-        chkUseWebView?.setOnPreferenceChangeListener { _, newValue ->
-            val value = newValue as Boolean
-            chkBlurredBackground?.isVisible = !value
-            chkShowCurrentDate?.isVisible = !value
-            //add android settings button
-            true
-        }
         chkActiveTimes?.setOnPreferenceChangeListener { _, newValue ->
             val value = newValue as Boolean
             editActiveSchedule?.isVisible = value

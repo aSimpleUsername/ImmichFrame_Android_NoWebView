@@ -14,10 +14,6 @@
 
     <PreferenceCategory android:title="Display Options">
         <SwitchPreferenceCompat
-            android:defaultValue="true"
-            android:key="useWebView"
-            android:title="Use WebView?" />
-        <SwitchPreferenceCompat
             android:defaultValue="false"
             android:key="blurredBackground"
             android:title="Blurred Background?" />
