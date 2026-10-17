@@ -56,6 +56,23 @@
             android:textSize="16sp"
             android:visibility="gone" />
 
+        <TextView
+            android:id="@+id/txtCalendar"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom|end"
+            android:background="@android:color/transparent"
+            android:gravity="end"
+            android:padding="8dp"
+            android:shadowColor="#99000000"
+            android:shadowDx="2"
+            android:shadowDy="2"
+            android:shadowRadius="4"
+            android:text=""
+            android:textColor="@android:color/white"
+            android:textSize="16sp"
+            android:visibility="gone" />
+
         <Button
             android:id="@+id/btnPrevious"
             android:layout_width="125dp"

@@ -10,6 +10,11 @@
             android:defaultValue=""
             android:key="authSecret"
             android:title="Authorization Secret" />
+        <EditTextPreference
+            android:defaultValue=""
+            android:inputType="textUri"
+            android:key="calendarUrl"
+            android:title="Calendar feed URL (optional)" />
     </PreferenceCategory>
 
     <PreferenceCategory android:title="Display Options">

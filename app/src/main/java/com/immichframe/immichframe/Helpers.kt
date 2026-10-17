@@ -8,6 +8,8 @@ import android.graphics.Paint
 import android.util.Base64
 import retrofit2.Call
 import retrofit2.http.GET
+import retrofit2.http.Url
+import com.google.gson.annotations.SerializedName
 import androidx.core.graphics.scale
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -149,6 +151,17 @@ object Helpers {
         val iconId: String
     )
 
+    data class CalendarResponse(
+        val updated: String?,
+        val events: List<CalendarEvent>?
+    )
+
+    data class CalendarEvent(
+        @SerializedName("when") val whenLabel: String?,
+        val title: String?,
+        val allDay: Boolean?
+    )
+
     interface ApiService {
         @GET("api/Asset/RandomImageAndInfo")
         fun getImageData(): Call<ImageResponse>
@@ -158,6 +171,10 @@ object Helpers {
 
         @GET("api/Weather")
         fun getWeather(): Call<Weather>
+
+        // Absolute URL (the VM calendar bridge), not the ImmichFrame base.
+        @GET
+        fun getCalendar(@Url url: String): Call<CalendarResponse>
     }
 
     fun createRetrofit(baseUrl: String, authSecret: String): Retrofit {

@@ -18,9 +18,13 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.os.PowerManager
+import android.graphics.Typeface
 import android.text.SpannableString
+import android.text.SpannableStringBuilder
 import android.text.Spanned
+import android.text.style.ForegroundColorSpan
 import android.text.style.RelativeSizeSpan
+import android.text.style.StyleSpan
 import android.util.Log
 import android.view.Gravity
 import android.view.KeyEvent
@@ -55,6 +59,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var imageView2: ImageView
     private lateinit var txtPhotoInfo: TextView
     private lateinit var txtDateTime: TextView
+    private lateinit var txtCalendar: TextView
     private lateinit var btnPrevious: Button
     private lateinit var btnPause: Button
     private lateinit var btnNext: Button
@@ -86,6 +91,16 @@ class MainActivity : AppCompatActivity() {
             if (isWeatherTimerRunning) {
                 handler.postDelayed(this, 600000)
                 getWeather()
+            }
+        }
+    }
+    private var calendarUrl: String = ""
+    private var isCalendarTimerRunning = false
+    private val calendarRunnable = object : Runnable {
+        override fun run() {
+            if (isCalendarTimerRunning) {
+                handler.postDelayed(this, 900000)   // 15 min
+                getCalendar()
             }
         }
     }
@@ -144,6 +159,7 @@ class MainActivity : AppCompatActivity() {
         imageView2 = findViewById(R.id.imageView2)
         txtPhotoInfo = findViewById(R.id.txtPhotoInfo)
         txtDateTime = findViewById(R.id.txtDateTime)
+        txtCalendar = findViewById(R.id.txtCalendar)
         btnPrevious = findViewById(R.id.btnPrevious)
         btnPause = findViewById(R.id.btnPause)
         btnNext = findViewById(R.id.btnNext)
@@ -525,6 +541,7 @@ class MainActivity : AppCompatActivity() {
         val prefs = PreferenceManager.getDefaultSharedPreferences(applicationContext)
         blurredBackground = prefs.getBoolean("blurredBackground", true)
         showCurrentDate = prefs.getBoolean("showCurrentDate", true)
+        calendarUrl = prefs.getString("calendarUrl", "")?.trim() ?: ""
         val savedUrl = prefs.getString("webview_url", "") ?: ""
         val authSecret = prefs.getString("authSecret", "") ?: ""
         val settingsLock = prefs.getBoolean("settingsLock", false)
@@ -613,6 +630,69 @@ class MainActivity : AppCompatActivity() {
         if (serverSettings.showWeatherDescription) {
             startWeatherTimer()
         }
+
+        if (calendarUrl.isNotEmpty()) {
+            if (!isCalendarTimerRunning) {
+                isCalendarTimerRunning = true
+                handler.post(calendarRunnable)
+            }
+        } else {
+            txtCalendar.visibility = View.GONE
+        }
+    }
+
+    private fun getCalendar() {
+        if (calendarUrl.isEmpty()) return
+        apiService.getCalendar(calendarUrl).enqueue(object : Callback<Helpers.CalendarResponse> {
+            override fun onResponse(
+                call: Call<Helpers.CalendarResponse>,
+                response: Response<Helpers.CalendarResponse>
+            ) {
+                try {
+                    val events = response.body()?.events.orEmpty()
+                        .filter { !it.title.isNullOrBlank() }
+                        .take(3)
+                    renderCalendar(events)
+                } catch (_: Exception) {
+                    txtCalendar.visibility = View.GONE
+                }
+            }
+
+            override fun onFailure(call: Call<Helpers.CalendarResponse>, t: Throwable) {
+                txtCalendar.visibility = View.GONE
+            }
+        })
+    }
+
+    private fun renderCalendar(events: List<Helpers.CalendarEvent>) {
+        if (events.isEmpty()) {
+            txtCalendar.visibility = View.GONE
+            return
+        }
+        val sb = SpannableStringBuilder()
+        events.forEachIndexed { i, e ->
+            if (i > 0) sb.append("\n")
+            val whenStart = sb.length
+            sb.append(e.whenLabel.orEmpty())
+            sb.setSpan(
+                RelativeSizeSpan(0.8f), whenStart, sb.length,
+                Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+            )
+            sb.setSpan(
+                ForegroundColorSpan(0xB3FFFFFF.toInt()), whenStart, sb.length,
+                Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+            )
+            sb.append("  ")
+            val titleStart = sb.length
+            sb.append(e.title.orEmpty())
+            sb.setSpan(
+                StyleSpan(Typeface.BOLD), titleStart, sb.length,
+                Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+            )
+        }
+        txtCalendar.text = sb
+        txtCalendar.textSize = Helpers.cssFontSizeToSp(serverSettings.baseFontSize, this) * 0.9f
+        txtCalendar.visibility = View.VISIBLE
     }
 
     private fun previousAction() {
@@ -769,6 +849,8 @@ class MainActivity : AppCompatActivity() {
             // Stop refreshing content while inactive
             stopImageTimer()
             stopWeatherTimer()
+            isCalendarTimerRunning = false
+            handler.removeCallbacks(calendarRunnable)
             dimOverlay.apply {
                 visibility = View.VISIBLE
                 alpha = 0.99f
