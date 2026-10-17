@@ -17,7 +17,10 @@ from zoneinfo import ZoneInfo
 
 import msal
 
-CLIENT_ID = os.environ["CLIENT_ID"]
+# Defaults to Microsoft's official first-party "Microsoft Graph Command Line Tools"
+# public client, so no Azure app registration is required for personal accounts.
+# Override with your own registration's client ID if you prefer an isolated identity.
+CLIENT_ID = os.environ.get("CLIENT_ID", "14d82eec-204b-4c2f-b7e8-296a70dab67e")
 AUTHORITY = "https://login.microsoftonline.com/consumers"
 SCOPES = ["Calendars.Read"]
 CACHE_PATH = os.environ.get("TOKEN_CACHE", "/data/token.json")

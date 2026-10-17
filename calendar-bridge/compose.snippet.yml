@@ -1,14 +1,15 @@
 # Paste this service into your existing docker-compose.yml (same file as Immich /
 # ImmichFrame), then `docker compose up -d --build immichframe-calendar`.
-# Replace <your-app-client-id> with the Application (client) ID from the Azure
-# app registration. No client secret is used (device-code flow).
+# No client secret and (by default) no Azure app registration are needed — the
+# bridge defaults to Microsoft's first-party Graph CLI public client.
+# To use your own app registration instead, uncomment CLIENT_ID below.
 
   immichframe-calendar:
     build: ./calendar-bridge
     container_name: immichframe-calendar
     restart: unless-stopped
     environment:
-      CLIENT_ID: "<your-app-client-id>"
+      # CLIENT_ID: "<your-own-app-client-id>"   # optional; omit to use the default
       TZ: "Australia/Perth"
       # Optional overrides:
       # LOOKAHEAD_DAYS: "90"
