@@ -532,6 +532,12 @@ class MainActivity : AppCompatActivity() {
                 setFrameActive(true)
             }
         }
+        if (savedUrl.isBlank()) {
+            // No server configured yet (e.g. a fresh install). onCreate already opens
+            // Settings; don't build a Retrofit client with an empty URL, which throws
+            // IllegalArgumentException ("no scheme was found") and crashes the app.
+            return
+        }
         retrofit = Helpers.createRetrofit(savedUrl, authSecret)
         apiService = retrofit!!.create(Helpers.ApiService::class.java)
         getServerSettings(

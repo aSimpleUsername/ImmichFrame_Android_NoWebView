@@ -439,6 +439,11 @@ class ScreenSaverService : DreamService() {
         txtPhotoInfo.visibility = View.GONE //enabled in onSettingsLoaded based on server settings
         txtDateTime.visibility = View.GONE //enabled in onSettingsLoaded based on server settings
 
+        if (savedUrl.isBlank()) {
+            // No server configured yet; don't build a Retrofit client with an empty URL,
+            // which throws IllegalArgumentException ("no scheme was found").
+            return
+        }
         retrofit = Helpers.createRetrofit(savedUrl, authSecret)
         apiService = retrofit!!.create(Helpers.ApiService::class.java)
         getServerSettings(
