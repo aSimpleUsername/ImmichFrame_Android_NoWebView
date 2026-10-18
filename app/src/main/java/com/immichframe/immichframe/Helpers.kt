@@ -8,7 +8,6 @@ import android.graphics.Paint
 import android.util.Base64
 import retrofit2.Call
 import retrofit2.http.GET
-import retrofit2.http.Url
 import com.google.gson.annotations.SerializedName
 import androidx.core.graphics.scale
 import okhttp3.OkHttpClient
@@ -171,10 +170,6 @@ object Helpers {
 
         @GET("api/Weather")
         fun getWeather(): Call<Weather>
-
-        // Absolute URL (the VM calendar bridge), not the ImmichFrame base.
-        @GET
-        fun getCalendar(@Url url: String): Call<CalendarResponse>
     }
 
     fun createRetrofit(baseUrl: String, authSecret: String): Retrofit {
@@ -194,18 +189,6 @@ object Helpers {
         }.build()
 
         return Retrofit.Builder().baseUrl(normalizedBaseUrl).client(client)
-            .addConverterFactory(GsonConverterFactory.create()).build()
-    }
-
-    // Separate client for the calendar bridge: no auth interceptor, so the ImmichFrame
-    // bearer secret is never sent to the (different) bridge host. The actual URL is
-    // supplied per-call via @Url, so the base here is only a required placeholder.
-    fun createCalendarRetrofit(): Retrofit {
-        val client = OkHttpClient.Builder()
-            .connectTimeout(10, TimeUnit.SECONDS)
-            .readTimeout(10, TimeUnit.SECONDS)
-            .build()
-        return Retrofit.Builder().baseUrl("http://localhost/").client(client)
             .addConverterFactory(GsonConverterFactory.create()).build()
     }
 

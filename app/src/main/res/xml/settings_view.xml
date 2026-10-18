@@ -15,6 +15,11 @@
             android:inputType="textUri"
             android:key="calendarUrl"
             android:title="Calendar feed URL (optional)" />
+        <EditTextPreference
+            android:defaultValue="1.1"
+            android:inputType="numberDecimal"
+            android:key="calendarFontScale"
+            android:title="Calendar text size (multiple of base font)" />
     </PreferenceCategory>
 
     <PreferenceCategory android:title="Display Options">

@@ -46,6 +46,9 @@ import retrofit2.Call
 import retrofit2.Callback
 import retrofit2.Response
 import retrofit2.Retrofit
+import com.google.gson.Gson
+import java.net.HttpURLConnection
+import java.net.URL
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
@@ -95,7 +98,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
     private var calendarUrl: String = ""
-    private var calendarApiService: Helpers.ApiService? = null
+    private var calendarFontScale = 1.1f
     private var isCalendarTimerRunning = false
     private val calendarRunnable = object : Runnable {
         override fun run() {
@@ -202,7 +205,14 @@ class MainActivity : AppCompatActivity() {
             onSettingsCommand = { runOnUiThread { settingsAction() } },
             onBrightnessCommand = { brightness -> runOnUiThread { screenBrightnessAction(brightness) } },
         )
-        rcpServer.start()
+        try {
+            rcpServer.start()
+        } catch (e: java.io.IOException) {
+            // The RPC control server (port 53287) is non-essential. If a previous instance
+            // still holds the port (EADDRINUSE on an activity relaunch), run without it
+            // rather than crashing the whole frame.
+            Log.w("MainActivity", "RPC control server not started: ${e.message}")
+        }
 
         registerReceiver(
             screenStateReceiver,
@@ -543,6 +553,7 @@ class MainActivity : AppCompatActivity() {
         blurredBackground = prefs.getBoolean("blurredBackground", true)
         showCurrentDate = prefs.getBoolean("showCurrentDate", true)
         calendarUrl = prefs.getString("calendarUrl", "")?.trim() ?: ""
+        calendarFontScale = prefs.getString("calendarFontScale", "1.1")?.toFloatOrNull() ?: 1.1f
         val savedUrl = prefs.getString("webview_url", "") ?: ""
         val authSecret = prefs.getString("authSecret", "") ?: ""
         val settingsLock = prefs.getBoolean("settingsLock", false)
@@ -633,10 +644,6 @@ class MainActivity : AppCompatActivity() {
         }
 
         if (calendarUrl.isNotEmpty()) {
-            if (calendarApiService == null) {
-                calendarApiService =
-                    Helpers.createCalendarRetrofit().create(Helpers.ApiService::class.java)
-            }
             if (!isCalendarTimerRunning) {
                 isCalendarTimerRunning = true
                 handler.post(calendarRunnable)
@@ -649,27 +656,37 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun getCalendar() {
-        val service = calendarApiService ?: return
-        if (calendarUrl.isEmpty()) return
-        service.getCalendar(calendarUrl).enqueue(object : Callback<Helpers.CalendarResponse> {
-            override fun onResponse(
-                call: Call<Helpers.CalendarResponse>,
-                response: Response<Helpers.CalendarResponse>
-            ) {
-                try {
-                    val events = response.body()?.events.orEmpty()
-                        .filter { !it.title.isNullOrBlank() }
-                        .take(3)
-                    renderCalendar(events)
-                } catch (_: Exception) {
+        val urlStr = calendarUrl
+        if (urlStr.isEmpty()) return
+        // Plain HttpURLConnection + Gson off the main thread. Avoids Retrofit's reflective
+        // @Url call-building, which aborts the ART runtime on this API-23 device.
+        CoroutineScope(Dispatchers.IO).launch {
+            val events: List<Helpers.CalendarEvent>? = try {
+                val conn = (URL(urlStr).openConnection() as HttpURLConnection).apply {
+                    connectTimeout = 10000
+                    readTimeout = 10000
+                    requestMethod = "GET"
+                }
+                val json = try {
+                    conn.inputStream.bufferedReader().use { it.readText() }
+                } finally {
+                    conn.disconnect()
+                }
+                Gson().fromJson(json, Helpers.CalendarResponse::class.java)
+                    ?.events.orEmpty()
+                    .filter { !it.title.isNullOrBlank() }
+                    .take(3)
+            } catch (_: Exception) {
+                null
+            }
+            withContext(Dispatchers.Main) {
+                if (events.isNullOrEmpty()) {
                     txtCalendar.visibility = View.GONE
+                } else {
+                    renderCalendar(events)
                 }
             }
-
-            override fun onFailure(call: Call<Helpers.CalendarResponse>, t: Throwable) {
-                txtCalendar.visibility = View.GONE
-            }
-        })
+        }
     }
 
     private fun renderCalendar(events: List<Helpers.CalendarEvent>) {
@@ -699,7 +716,7 @@ class MainActivity : AppCompatActivity() {
             )
         }
         txtCalendar.text = sb
-        txtCalendar.textSize = Helpers.cssFontSizeToSp(serverSettings.baseFontSize, this) * 0.9f
+        txtCalendar.textSize = Helpers.cssFontSizeToSp(serverSettings.baseFontSize, this) * calendarFontScale
         txtCalendar.visibility = View.VISIBLE
     }
 
@@ -1035,7 +1052,11 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        rcpServer.stop()
+        try {
+            rcpServer.stop()
+        } catch (e: Exception) {
+            Log.w("MainActivity", "RPC control server stop failed: ${e.message}")
+        }
         unregisterReceiver(screenStateReceiver)
         handler.removeCallbacksAndMessages(null)
     }
